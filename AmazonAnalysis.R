@@ -8,10 +8,22 @@ library(ggmosaic)
 library(embed)
 library(ggplot2)
 
+# R - get into an interactive environment
+# exit - leave server
+# R CMD BATCH --no-save --no-restore AmazonAnalysis.R & - run entire r script in the background (&) without saving workspace and without loading something into the environment
+# top - show running processes
+# save(file="filename.RData", list=c("logReg_wf))
+# load("filename.RData")
+
+
+
 
 # Read in data
-train <- vroom("./STAT348/AmazonEmployeeAccess/amazon-employee-access-challenge/train.csv")
-test <- vroom("./STAT348/AmazonEmployeeAccess/amazon-employee-access-challenge/test.csv")
+#train <- vroom("./STAT348/AmazonEmployeeAccess/amazon-employee-access-challenge/train.csv")
+#test <- vroom("./STAT348/AmazonEmployeeAccess/amazon-employee-access-challenge/test.csv")
+
+train <- vroom("./amazon-employee-access-challenge/train.csv")
+test <- vroom("./amazon-employee-access-challenge/test.csv")
 
 
 eda_data <- data.frame(lapply(train, factor))
