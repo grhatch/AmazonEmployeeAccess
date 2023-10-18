@@ -19,10 +19,10 @@ library(ggplot2)
 
 
 # Read in data
-#train <- vroom("./STAT348/AmazonEmployeeAccess/amazon-employee-access-challenge/train.csv")
-#test <- vroom("./STAT348/AmazonEmployeeAccess/amazon-employee-access-challenge/test.csv")
+train <- vroom("./STAT348/AmazonEmployeeAccess/amazon-employee-access-challenge/train.csv")
+test <- vroom("./STAT348/AmazonEmployeeAccess/amazon-employee-access-challenge/test.csv")
 
-train <- vroom("./amazon-employee-access-challenge/train.csv")
+train <- vroom("./amazon-employee-access-challenge/train.csv") 
 test <- vroom("./amazon-employee-access-challenge/test.csv")
 
 
@@ -141,3 +141,125 @@ penlog_pred <- penlog_final_wf %>%
   rename(Action = .pred_1) # rename pred to count (for submission to Kaggle)
 
 vroom_write(penlog_pred, "penlog_pred.csv", delim = ',')
+
+
+
+
+###################
+## Random Forest ##
+###################
+
+rf_model <- rand_forest(mtry = tune(),
+                      min_n=tune(),
+                      trees=500) %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
+
+
+
+rf_recipe <- recipe(ACTION~., data=train_new) %>%
+  step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric features into factors
+  step_other(all_nominal_predictors(), threshold = .001) %>% # combines categorical values that occur <5% into an "other" value
+  #step_dummy(all_nominal_predictors()) # dummy variable encoding
+  step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) #target encoding
+
+
+# set up workflow
+rf_wf <- workflow() %>%
+  add_recipe(rf_recipe) %>%
+  add_model(rf_model)
+
+L <- 5
+## Grid of values to tune over; these should be params in the model
+rf_tuning_grid <- grid_regular(mtry(range = c(1,10)),
+                               min_n(),
+                               levels = L) ## L^2 total tuning possibilities
+
+K <- 5
+## Split data for CV
+rf_folds <- vfold_cv(train_new, v = K, repeats=1)
+
+## Run CV
+rf_CV_results <- rf_wf %>%
+  tune_grid(resamples=rf_folds,
+            grid=rf_tuning_grid,
+            metrics=metric_set(roc_auc))
+
+## Find Best Tuning Parameters
+rf_bestTune <- rf_CV_results %>%
+  select_best("roc_auc")
+
+
+## Finalize the Workflow & fit it
+rf_final_wf <-
+  rf_wf %>%
+  finalize_workflow(rf_bestTune) %>%
+  fit(data=train_new)
+
+## Predict
+rf_pred <- rf_final_wf %>%
+  predict(new_data = test, type="prob") %>%
+  bind_cols(.,test) %>% # bind predictions with test data
+  select(id, .pred_1) %>% # Just keep datetime and predictions
+  rename(Action = .pred_1) # rename pred to count (for submission to Kaggle)
+
+vroom_write(rf_pred, "rf_classification_pred.csv", delim = ',')
+
+
+############################
+## Naive Bayes Classifier ##
+############################
+library(discrim)
+
+nb_recipe <- recipe(ACTION~., data=train_new) %>%
+  step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric features into factors
+  step_other(all_nominal_predictors(), threshold = .001) %>% # combines categorical values that occur <5% into an "other" value
+  #step_dummy(all_nominal_predictors()) # dummy variable encoding
+  step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) #target encoding
+
+nb_model <- naive_Bayes(Laplace=tune(), smoothness=tune()) %>%
+  set_mode("classification") %>%
+  set_engine("naivebayes")
+
+
+nb_wf <- workflow() %>%
+  add_recipe(nb_recipe) %>%
+  add_model(nb_model)
+
+L <- 5
+## Grid of values to tune over; these should be params in the model
+nb_tuning_grid <- grid_regular(Laplace(),
+                               smoothness(),
+                               levels = L) ## L^2 total tuning possibilities
+
+K <- 5
+## Split data for CV
+nb_folds <- vfold_cv(train_new, v = K, repeats=1)
+
+## Run CV
+nb_CV_results <- nb_wf %>%
+  tune_grid(resamples=nb_folds,
+            grid=nb_tuning_grid,
+            metrics=metric_set(roc_auc))
+
+## Find Best Tuning Parameters
+nb_bestTune <- nb_CV_results %>%
+  select_best("roc_auc")
+
+## Finalize the Workflow & fit it
+nb_final_wf <-
+  nb_wf %>%
+  finalize_workflow(nb_bestTune) %>%
+  fit(data=train_new)
+
+## Predict
+nb_pred <- nb_final_wf %>%
+  predict(new_data = test, type="prob") %>%
+  bind_cols(.,test) %>% # bind predictions with test data
+  select(id, .pred_1) %>% # Just keep datetime and predictions
+  rename(Action = .pred_1) # rename pred to count (for submission to Kaggle)
+
+vroom_write(nb_pred, "nb_classification_pred.csv", delim = ',')
+
+
+
