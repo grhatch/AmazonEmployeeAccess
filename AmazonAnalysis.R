@@ -277,7 +277,7 @@ knn_recipe <- recipe(ACTION~., data=train_new) %>%
   step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) #target encoding
 
 ## knn mode
-knn_model <- nearest_neighbor(neighbors=5) %>% # set or tune
+knn_model <- nearest_neighbor(neighbors=tune()) %>% # set or tune
   set_mode("classification") %>%
   set_engine("kknn")
 
@@ -285,34 +285,33 @@ knn_wf <- workflow() %>%
   add_recipe(knn_recipe) %>%
   add_model(knn_model)
 
-# L <- 5
-# ## Grid of values to tune over; these should be params in the model
-# nb_tuning_grid <- grid_regular(Laplace(),
-#                                smoothness(),
-#                                levels = L) ## L^2 total tuning possibilities
-# 
-# K <- 5
-# ## Split data for CV
-# nb_folds <- vfold_cv(train_new, v = K, repeats=1)
-# 
-# ## Run CV
-# nb_CV_results <- nb_wf %>%
-#   tune_grid(resamples=nb_folds,
-#             grid=nb_tuning_grid,
-#             metrics=metric_set(roc_auc))
-# 
-# ## Find Best Tuning Parameters
-# nb_bestTune <- nb_CV_results %>%
-#   select_best("roc_auc")
-# 
-# ## Finalize the Workflow & fit it
-# nb_final_wf <-
-#   nb_wf %>%
-#   finalize_workflow(nb_bestTune) %>%
-#   fit(data=train_new)
+L <- 5
+## Grid of values to tune over; these should be params in the model
+knn_tuning_grid <- grid_regular(neighbors(),
+                               levels = L) ## L^2 total tuning possibilities
+
+K <- 5
+## Split data for CV
+knn_folds <- vfold_cv(train_new, v = K, repeats=1)
+
+## Run CV
+knn_CV_results <- knn_wf %>%
+  tune_grid(resamples=knn_folds,
+            grid=knn_tuning_grid,
+            metrics=metric_set(roc_auc))
+
+## Find Best Tuning Parameters
+knn_bestTune <- knn_CV_results %>%
+  select_best("roc_auc")
+
+## Finalize the Workflow & fit it
+knn_final_wf <-
+  knn_wf %>%
+  finalize_workflow(knn_bestTune) %>%
+  fit(data=train_new)
 
 ## Predict
-knn_pred <- knn_wf %>% fit(data=train_new) %>%
+knn_pred <- knn_final_wf %>% 
   predict(new_data = test, type="prob") %>%
   bind_cols(.,test) %>% # bind predictions with test data
   select(id, .pred_1) %>% # Just keep datetime and predictions
