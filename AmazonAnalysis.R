@@ -263,3 +263,59 @@ vroom_write(nb_pred, "nb_classification_pred.csv", delim = ',')
 
 
 
+#########################
+## K-Nearest-Neighbors ##
+#########################
+
+# make sure to normalize in the recipe
+
+knn_recipe <- recipe(ACTION~., data=train_new) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_mutate_at(all_numeric_predictors(), fn = factor) %>% # turn all numeric features into factors
+  step_other(all_nominal_predictors(), threshold = .001) %>% # combines categorical values that occur <5% into an "other" value
+  #step_dummy(all_nominal_predictors()) # dummy variable encoding
+  step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) #target encoding
+
+## knn mode
+knn_model <- nearest_neighbor(neighbors=5) %>% # set or tune
+  set_mode("classification") %>%
+  set_engine("kknn")
+
+knn_wf <- workflow() %>%
+  add_recipe(knn_recipe) %>%
+  add_model(knn_model)
+
+# L <- 5
+# ## Grid of values to tune over; these should be params in the model
+# nb_tuning_grid <- grid_regular(Laplace(),
+#                                smoothness(),
+#                                levels = L) ## L^2 total tuning possibilities
+# 
+# K <- 5
+# ## Split data for CV
+# nb_folds <- vfold_cv(train_new, v = K, repeats=1)
+# 
+# ## Run CV
+# nb_CV_results <- nb_wf %>%
+#   tune_grid(resamples=nb_folds,
+#             grid=nb_tuning_grid,
+#             metrics=metric_set(roc_auc))
+# 
+# ## Find Best Tuning Parameters
+# nb_bestTune <- nb_CV_results %>%
+#   select_best("roc_auc")
+# 
+# ## Finalize the Workflow & fit it
+# nb_final_wf <-
+#   nb_wf %>%
+#   finalize_workflow(nb_bestTune) %>%
+#   fit(data=train_new)
+
+## Predict
+knn_pred <- knn_wf %>% fit(data=train_new) %>%
+  predict(new_data = test, type="prob") %>%
+  bind_cols(.,test) %>% # bind predictions with test data
+  select(id, .pred_1) %>% # Just keep datetime and predictions
+  rename(Action = .pred_1) # rename pred to count (for submission to Kaggle)
+
+vroom_write(knn_pred, "knn_pred.csv", delim = ',')
