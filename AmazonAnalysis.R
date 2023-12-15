@@ -19,10 +19,10 @@ library(ggplot2)
 
 
 # Read in data
-#train <- vroom("./STAT348/AmazonEmployeeAccess/amazon-employee-access-challenge/train.csv")
+amztrain <- vroom("./STAT348/AmazonEmployeeAccess/amazon-employee-access-challenge/train.csv")
 #test <- vroom("./STAT348/AmazonEmployeeAccess/amazon-employee-access-challenge/test.csv")
-
-train <- vroom("./amazon-employee-access-challenge/train.csv") 
+View(amztrain)
+amztrain <- vroom("./amazon-employee-access-challenge/train.csv") 
 test <- vroom("./amazon-employee-access-challenge/test.csv")
 
 
